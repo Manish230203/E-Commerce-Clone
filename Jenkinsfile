@@ -37,8 +37,8 @@ pipeline {
             '''
 
             sh "docker --version"
-            sh "docker build -t ${IMAGE_NAME}:${tag} ."
-            sh "docker tag ${IMAGE_NAME}:${tag} ${IMAGE_NAME}:latest"
+            sh "docker build -t ${ecommerce-frontend}:${v1} ."
+            sh "docker tag ${ecommerce-frontend}:${v1} ${ecommerce-frontend}:latest"
           }
         }
       }
@@ -47,14 +47,14 @@ pipeline {
     stage('Push to Docker Hub') {
       steps {
         withCredentials([usernamePassword(credentialsId: "${DOCKERHUB_CREDENTIALS}",
-                                          usernameVariable: 'DH_USER',
-                                          passwordVariable: 'DH_PASS')]) {
+                                        usernameVariable: 'manish2302',
+                                        passwordVariable: 'Manish@2302')]) {
           // run docker login & push inside dind as well
           container('dind') {
             // login
             sh "echo \"$DH_PASS\" | docker login -u \"$DH_USER\" --password-stdin"
-            sh "docker push ${IMAGE_NAME}:${env.BUILD_NUMBER}"
-            sh "docker push ${IMAGE_NAME}:latest"
+            sh "docker push ${ecommerce-frontend}:${env.BUILD_NUMBER}"
+            sh "docker push ${ecommerce-frontend}:latest"
           }
         }
       }
