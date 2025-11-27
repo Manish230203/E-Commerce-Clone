@@ -1,7 +1,7 @@
 pipeline {
-  agent{
-     kubernetes {
-            yaml '''
+  agent {
+    kubernetes {
+      yaml '''
 apiVersion: v1
 kind: Pod
 spec:
@@ -21,7 +21,7 @@ spec:
       readOnlyRootFilesystem: false
     env:
     - name: KUBECONFIG
-      value: /kube/config        
+      value: /kube/config
     volumeMounts:
     - name: kubeconfig-secret
       mountPath: /kube/config
@@ -29,14 +29,14 @@ spec:
   - name: dind
     image: docker:dind
     securityContext:
-      privileged: true  # Needed to run Docker daemon
+      privileged: true
     env:
     - name: DOCKER_TLS_CERTDIR
-      value: ""  # Disable TLS for simplicity
+      value: ""
     volumeMounts:
     - name: docker-config
       mountPath: /etc/docker/daemon.json
-      subPath: daemon.json  # Mount the file directly here
+      subPath: daemon.json
   volumes:
   - name: docker-config
     configMap:
@@ -45,12 +45,11 @@ spec:
     secret:
       secretName: kubeconfig-secret
 '''
-        }
+    }
   }
 
   environment {
-    DOCKERHUB_CREDENTIALS = 'dockerhub-cred'
-    KUBECONFIG_CREDENTIALS = 'kubeconfig-cred'
+    DOCKERHUB_CREDENTIALS = 'dockerhub-cred'   // Jenkins username/password credential ID
     LOCAL_IMAGE = 'e-commerce-clone'
   }
 
@@ -63,14 +62,9 @@ spec:
 
     stage('Build Docker') {
       steps {
-        // All Groovy (def, etc.) must be inside script { }
         script {
-          // compute tag in Groovy
           def tag = "${env.BUILD_NUMBER}"
-
-          // run docker commands inside the dind container
           container('dind') {
-            // wait for docker daemon
             sh '''
               set -e
               attempt=0
@@ -84,33 +78,49 @@ spec:
                 exit 1
               fi
             '''
-
             sh "docker --version"
-            // Build using the Groovy variable (string interpolation)
             sh "docker build -t ${LOCAL_IMAGE}:${tag} ."
             sh "docker tag ${LOCAL_IMAGE}:${tag} ${LOCAL_IMAGE}:latest"
-          } // end container('dind')
-        } // end script
-      } // end steps
-    } // end stage
+          }
+        }
+      }
+    }
 
     stage('Push to Docker Hub') {
       steps {
+        // Use Jenkins username/password credential; available only inside withCredentials
         withCredentials([usernamePassword(credentialsId: "${DOCKERHUB_CREDENTIALS}",
                                           usernameVariable: 'DH_USER',
                                           passwordVariable: 'DH_PASS')]) {
           script {
             def tag = "${env.BUILD_NUMBER}"
-
             container('dind') {
-              // Tag to the credentials' namespace, login and push
+              // Tag to DockerHub namespace and push
               sh "docker tag ${LOCAL_IMAGE}:${tag} ${DH_USER}/${LOCAL_IMAGE}:${tag}"
-              // use script: form to avoid insecure interpolation warning
+              // avoid insecure interpolation: pass password to stdin
               sh(script: "echo \"$DH_PASS\" | docker login -u \"$DH_USER\" --password-stdin")
               sh "docker push ${DH_USER}/${LOCAL_IMAGE}:${tag}"
               sh "docker tag ${LOCAL_IMAGE}:${tag} ${DH_USER}/${LOCAL_IMAGE}:latest"
               sh "docker push ${DH_USER}/${LOCAL_IMAGE}:latest"
+              // write pushed image name to a file for use later if desired
+              sh "echo ${DH_USER}/${LOCAL_IMAGE}:latest > pushed-image.txt"
             }
+          }
+        }
+      }
+    }
+
+    stage('SonarQube Analysis') {
+      steps {
+        container('sonar-scanner') {
+          withCredentials([string(credentialsId: 'sonar-token-2401199', variable: 'SONAR_TOKEN')]) {
+            sh '''
+              sonar-scanner \
+                -Dsonar.projectKey=2401199_attendance-system \
+                -Dsonar.host.url=http://my-sonarqube-sonarqube.sonarqube.svc.cluster.local:9000 \
+                -Dsonar.login=$SONAR_TOKEN \
+                -Dsonar.python.coverage.reportPaths=coverage.xml
+            '''
           }
         }
       }
@@ -118,21 +128,32 @@ spec:
 
     stage('Deploy to Kubernetes') {
       steps {
-        withCredentials([file(credentialsId: "${KUBECONFIG_CREDENTIALS}", variable: 'KUBECONFIG_FILE')]) {
+        // We need DH_USER to know the image name — reuse same Jenkins credential
+        withCredentials([usernamePassword(credentialsId: "${DOCKERHUB_CREDENTIALS}",
+                                          usernameVariable: 'DH_USER',
+                                          passwordVariable: 'DH_PASS')]) {
           script {
-            sh 'mkdir -p ~/.kube'
-            sh 'cp $KUBECONFIG_FILE ~/.kube/config'
-            // use DH_USER from credentials; DH_USER will be available only inside withCredentials
-            // sed replacement uses ${env.BUILD_NUMBER} and ${DH_USER}/${LOCAL_IMAGE}
-            sh """
-              sed -i.bak -E 's|(image:\\s*).+|\\1${env.DH_USER ?: env.DOCKERHUB_USER}/${LOCAL_IMAGE}:${env.BUILD_NUMBER}|' k8s-deployment/deployment.yaml || true
-              kubectl apply -f k8s-deployment/
-            """
+            // image to deploy
+            def imageToDeploy = "${env.DH_USER}/${LOCAL_IMAGE}:latest"
+            container('kubectl') {
+              // kubeconfig is already mounted at /kube/config in the kubectl container
+              // apply manifests (adjust filenames/paths as needed)
+              sh """
+                # if you prefer to update image via kubectl set image (safer than sed in-place)
+                kubectl -n 2401199 set image deployment/your-deployment-name your-container-name=${imageToDeploy} || true
+
+                # apply manifests in the k8s-deployment directory (if they contain the correct image or are image-agnostic)
+                kubectl apply -f k8s-deployment/ || true
+
+                # wait for rollout (change deployment name accordingly)
+                kubectl -n 2401199 rollout status deployment/your-deployment-name --timeout=120s || true
+              """
+            }
           }
         }
       }
     }
-  } // end stages
+  }
 
   post {
     always {
