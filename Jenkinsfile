@@ -2,9 +2,9 @@ pipeline {
   agent any
 
   environment {
-    DOCKERHUB_CREDENTIALS = 'dockerhub-cred'    // Jenkins credentials id (username/password)
-    KUBECONFIG_CREDENTIALS = 'kubeconfig-cred'  // Jenkins credentials id (file containing kubeconfig)
-    IMAGE_NAME = 'manish2302/e-commerce-clone'   // update if your Docker Hub username differs
+    DOCKERHUB_CREDENTIALS = 'dockerhub-cred'
+    KUBECONFIG_CREDENTIALS = 'kubeconfig-cred'
+    IMAGE_NAME = 'manish2302/e-commerce-clone'
   }
 
   stages {
@@ -18,30 +18,52 @@ pipeline {
       steps {
         script {
           def tag = "${env.BUILD_NUMBER}"
-          sh "docker --version || true"
-          sh "docker build -t ${IMAGE_NAME}:${tag} ."
-          sh "docker tag ${IMAGE_NAME}:${tag} ${IMAGE_NAME}:latest"
+
+          // Run docker commands inside the sidecar 'dind' container where dockerd/docker CLI exist
+          container('dind') {
+            // wait for dockerd to be ready (simple loop)
+            sh '''
+              set -e
+              attempt=0
+              until docker info >/dev/null 2>&1 || [ $attempt -ge 15 ]; do
+                echo "Waiting for dockerd..."
+                sleep 2
+                attempt=$((attempt+1))
+              done
+              if ! docker info >/dev/null 2>&1; then
+                echo "dockerd did not start"
+                exit 1
+              fi
+            '''
+
+            sh "docker --version"
+            sh "docker build -t ${IMAGE_NAME}:${tag} ."
+            sh "docker tag ${IMAGE_NAME}:${tag} ${IMAGE_NAME}:latest"
+          }
         }
       }
     }
 
     stage('Push to Docker Hub') {
       steps {
-        // Bind username/password only for this step
         withCredentials([usernamePassword(credentialsId: "${DOCKERHUB_CREDENTIALS}",
                                           usernameVariable: 'DH_USER',
                                           passwordVariable: 'DH_PASS')]) {
-          sh "echo $DH_PASS | docker login -u $DH_USER --password-stdin"
-          sh "docker push ${IMAGE_NAME}:${env.BUILD_NUMBER}"
-          sh "docker push ${IMAGE_NAME}:latest"
+          // run docker login & push inside dind as well
+          container('dind') {
+            // login
+            sh "echo \"$DH_PASS\" | docker login -u \"$DH_USER\" --password-stdin"
+            sh "docker push ${IMAGE_NAME}:${env.BUILD_NUMBER}"
+            sh "docker push ${IMAGE_NAME}:latest"
+          }
         }
       }
     }
 
     stage('Deploy to Kubernetes') {
       steps {
-        // Bind kubeconfig file only for this step
         withCredentials([file(credentialsId: "${KUBECONFIG_CREDENTIALS}", variable: 'KUBECONFIG_FILE')]) {
+          // kubectl should be available in the jnlp agent; if not, you can create a container with kubectl and wrap in container('kubectl') { ... }
           sh 'mkdir -p ~/.kube'
           sh 'cp $KUBECONFIG_FILE ~/.kube/config'
           sh """
@@ -55,7 +77,8 @@ pipeline {
 
   post {
     always {
-      cleanWs()
+      // cleanWs() unavailable in your environment; use deleteDir() which is present
+      deleteDir()
     }
     failure {
       echo "Build failed: ${env.JOB_NAME} #${env.BUILD_NUMBER}"
