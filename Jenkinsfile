@@ -9,7 +9,6 @@ metadata:
   labels:
     jenkins: agent
 spec:
-  priorityClassName: jenkins-agent-high
   containers:
     - name: sonar-scanner
       image: sonarsource/sonar-scanner-cli:latest
@@ -72,7 +71,7 @@ spec:
     IMAGE_NAME        = "ecommerce-frontend"
     IMAGE_TAG         = "v1"
     REGISTRY_URL      = "nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085"
-    REGISTRY_REPO     = "ajinkya-project"
+    REGISTRY_REPO     = "manish-project"
     FULL_IMAGE_NAME   = "${REGISTRY_URL}/${REGISTRY_REPO}/${IMAGE_NAME}:${IMAGE_TAG}"
 
     SONAR_HOST_URL    = "http://my-sonarqube-sonarqube.sonarqube.svc.cluster.local:9000"
