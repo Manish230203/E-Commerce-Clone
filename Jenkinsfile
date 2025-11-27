@@ -4,7 +4,7 @@ pipeline {
   environment {
     DOCKERHUB_CREDENTIALS = 'dockerhub-cred'
     KUBECONFIG_CREDENTIALS = 'kubeconfig-cred'
-    IMAGE_NAME = 'manish2302/e-commerce-clone'
+    IMAGE_NAME = 'manish2302/ecommerce-frontend'
   }
 
   stages {
@@ -67,7 +67,7 @@ pipeline {
           sh 'mkdir -p ~/.kube'
           sh 'cp $KUBECONFIG_FILE ~/.kube/config'
           sh """
-            sed -i.bak -E 's|(image:\\s*).+|\\1${IMAGE_NAME}:${env.BUILD_NUMBER}|' k8s-deployment/deployment.yaml || true
+            sed -i.bak -E 's|(image:\\s*).+|\\1${ecommerce-frontend}:${env.BUILD_NUMBER}|' k8s-deployment/deployment.yaml || true
             kubectl apply -f k8s-deployment/
           """
         }
