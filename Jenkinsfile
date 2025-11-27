@@ -1,4 +1,4 @@
-```groovy
+
 push:
 branches: [ main, dev ]
 pull_request:
@@ -44,4 +44,3 @@ kubeconfig: ${{ secrets.KUBE_CONFIG }}
 manifests: |
 k8s-deployment/deployment.yaml
 k8s-deployment/service.yaml
-```
