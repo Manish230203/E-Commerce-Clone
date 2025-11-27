@@ -2,8 +2,8 @@ pipeline {
   agent any
 
   environment {
-    DOCKERHUB_CREDENTIALS = 'dockerhub-cred'    // Jenkins credentials id (username/password)
-    KUBECONFIG_CREDENTIALS = 'kubeconfig-cred'  // Jenkins credentials id (file containing kubeconfig)
+    DOCKERHUB_CREDENTIALS = 'manish/Manish@2302'    // Jenkins credentials id (username/password)
+    KUBECONFIG_CREDENTIALS = 'k8s-deployment.yaml'  // Jenkins credentials id (file containing kubeconfig)
     DOCKERHUB_USER = credentials(DOCKERHUB_CREDENTIALS).username
     DOCKERHUB_PASS = credentials(DOCKERHUB_CREDENTIALS).password
     IMAGE_NAME = "${DOCKERHUB_USER}/e-commerce-clone"
