@@ -1,24 +1,23 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: 2401096
+  name: ecommerce-frontend-deployment
   labels:
-    app: shoplane-frontend
+    app: ecommerce-frontend
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: shoplane-frontend
+      app: ecommerce-frontend
   template:
     metadata:
       labels:
-        app: shoplane-frontend
+        app: ecommerce-frontend
     spec:
       containers:
-        - name: 2401096
-          # TODO: change this to your real registry + image name
-          image: your-dockerhub-username/shoplane-frontend:latest
-          imagePullPolicy: Always
+        - name: ecommerce-frontend
+          image: your-placeholder-image/replace-me:latest
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 80
           resources:
@@ -28,19 +27,18 @@ spec:
             limits:
               cpu: "200m"
               memory: "256Mi"
-
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: shoplane-frontend-service
+  name: ecommerce-frontend-service
   labels:
-    app: shoplane-frontend
+    app: ecommerce-frontend
 spec:
   selector:
-    app: shoplane-frontend
+    app: ecommerce-frontend
   ports:
     - name: http
       port: 80
       targetPort: 80
-  type: LoadBalancer  # or NodePort if your cluster doesn't support LoadBalancer
+  type: LoadBalancer
