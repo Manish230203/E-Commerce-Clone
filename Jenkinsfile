@@ -2,9 +2,9 @@ pipeline {
   agent any
 
   environment {
-    DOCKERHUB_CREDENTIALS = 'dockerhub-cred'    // credentials id in Jenkins
-    KUBECONFIG_CREDENTIALS = 'kubeconfig-cred'  // file credential id in Jenkins
-    LOCAL_IMAGE = 'e-commerce-clone'            // local build name (must be quoted)
+    DOCKERHUB_CREDENTIALS = 'dockerhub-cred'
+    KUBECONFIG_CREDENTIALS = 'kubeconfig-cred'
+    LOCAL_IMAGE = 'e-commerce-clone'
   }
 
   stages {
@@ -16,10 +16,14 @@ pipeline {
 
     stage('Build Docker') {
       steps {
+        // All Groovy (def, etc.) must be inside script { }
         script {
+          // compute tag in Groovy
           def tag = "${env.BUILD_NUMBER}"
+
+          // run docker commands inside the dind container
           container('dind') {
-            // wait for dockerd to be ready
+            // wait for docker daemon
             sh '''
               set -e
               attempt=0
@@ -33,27 +37,33 @@ pipeline {
                 exit 1
               fi
             '''
+
             sh "docker --version"
+            // Build using the Groovy variable (string interpolation)
             sh "docker build -t ${LOCAL_IMAGE}:${tag} ."
             sh "docker tag ${LOCAL_IMAGE}:${tag} ${LOCAL_IMAGE}:latest"
-          }
-        }
-      }
-    }
+          } // end container('dind')
+        } // end script
+      } // end steps
+    } // end stage
 
     stage('Push to Docker Hub') {
       steps {
         withCredentials([usernamePassword(credentialsId: "${DOCKERHUB_CREDENTIALS}",
                                           usernameVariable: 'DH_USER',
                                           passwordVariable: 'DH_PASS')]) {
-          container('dind') {
+          script {
             def tag = "${env.BUILD_NUMBER}"
-            // Tag using credentials' username namespace
-            sh "docker tag ${LOCAL_IMAGE}:${tag} ${DH_USER}/${LOCAL_IMAGE}:${tag}"
-            sh(script: "echo \"$DH_PASS\" | docker login -u \"$DH_USER\" --password-stdin")
-            sh "docker push ${DH_USER}/${LOCAL_IMAGE}:${tag}"
-            sh "docker tag ${LOCAL_IMAGE}:${tag} ${DH_USER}/${LOCAL_IMAGE}:latest"
-            sh "docker push ${DH_USER}/${LOCAL_IMAGE}:latest"
+
+            container('dind') {
+              // Tag to the credentials' namespace, login and push
+              sh "docker tag ${LOCAL_IMAGE}:${tag} ${DH_USER}/${LOCAL_IMAGE}:${tag}"
+              // use script: form to avoid insecure interpolation warning
+              sh(script: "echo \"$DH_PASS\" | docker login -u \"$DH_USER\" --password-stdin")
+              sh "docker push ${DH_USER}/${LOCAL_IMAGE}:${tag}"
+              sh "docker tag ${LOCAL_IMAGE}:${tag} ${DH_USER}/${LOCAL_IMAGE}:latest"
+              sh "docker push ${DH_USER}/${LOCAL_IMAGE}:latest"
+            }
           }
         }
       }
@@ -62,16 +72,20 @@ pipeline {
     stage('Deploy to Kubernetes') {
       steps {
         withCredentials([file(credentialsId: "${KUBECONFIG_CREDENTIALS}", variable: 'KUBECONFIG_FILE')]) {
-          sh 'mkdir -p ~/.kube'
-          sh 'cp $KUBECONFIG_FILE ~/.kube/config'
-          sh """
-            sed -i.bak -E 's|(image:\\s*).+|\\1${DH_USER}/${LOCAL_IMAGE}:${env.BUILD_NUMBER}|' k8s-deployment/deployment.yaml || true
-            kubectl apply -f k8s-deployment/
-          """
+          script {
+            sh 'mkdir -p ~/.kube'
+            sh 'cp $KUBECONFIG_FILE ~/.kube/config'
+            // use DH_USER from credentials; DH_USER will be available only inside withCredentials
+            // sed replacement uses ${env.BUILD_NUMBER} and ${DH_USER}/${LOCAL_IMAGE}
+            sh """
+              sed -i.bak -E 's|(image:\\s*).+|\\1${env.DH_USER ?: env.DOCKERHUB_USER}/${LOCAL_IMAGE}:${env.BUILD_NUMBER}|' k8s-deployment/deployment.yaml || true
+              kubectl apply -f k8s-deployment/
+            """
+          }
         }
       }
     }
-  }
+  } // end stages
 
   post {
     always {
