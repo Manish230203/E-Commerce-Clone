@@ -67,20 +67,20 @@ spec:
     }
   }
 
-  environment {
-    IMAGE_NAME        = "ecommerce-frontend"
-    IMAGE_TAG         = "v1"
-    REGISTRY_URL      = "nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085"
-    REGISTRY_REPO     = "manish-project"
-    FULL_IMAGE_NAME   = "${REGISTRY_URL}/${REGISTRY_REPO}/${IMAGE_NAME}:${IMAGE_TAG}"
+  // environment {
+  //   IMAGE_NAME        = "ecommerce-frontend"
+  //   IMAGE_TAG         = "v1"
+  //   REGISTRY_URL      = "nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085"
+  //   REGISTRY_REPO     = "manish-project"
+  //   FULL_IMAGE_NAME   = "${REGISTRY_URL}/${REGISTRY_REPO}/${IMAGE_NAME}:${IMAGE_TAG}"
 
-    SONAR_HOST_URL    = "http://my-sonarqube-sonarqube.sonarqube.svc.cluster.local:9000"
-    SONAR_PROJECT_KEY = "2401096_ecommerce_website"
+  //   SONAR_HOST_URL    = "http://my-sonarqube-sonarqube.sonarqube.svc.cluster.local:9000"
+  //   SONAR_PROJECT_KEY = "2401096_ecommerce_website"
 
-    K8S_NAMESPACE     = "2401096"
-    K8S_DEPLOYMENT    = "ecommerce-frontend-deployment"
-    K8S_MANIFEST_FILE = "ecommerce-frontend-deployment.yaml"
-  }
+  //   K8S_NAMESPACE     = "2401096"
+  //   K8S_DEPLOYMENT    = "ecommerce-frontend-deployment"
+  //   K8S_MANIFEST_FILE = "ecommerce-frontend-deployment.yaml"
+  // }
 
   options {
     // Prevent parallel builds if that leads to too many pods
