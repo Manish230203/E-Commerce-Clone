@@ -1,44 +1,26 @@
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: ecommerce-frontend-deployment
+  name: e-commerce-clone
   labels:
-    app: ecommerce-frontend
+    app: e-commerce-clone
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: ecommerce-frontend
+      app: e-commerce-clone
   template:
     metadata:
       labels:
-        app: ecommerce-frontend
+        app: e-commerce-clone
     spec:
       containers:
-        - name: ecommerce-frontend
-          image: your-placeholder-image/replace-me:latest   # Jenkins will replace this
-          imagePullPolicy: Always
-          ports:
-            - containerPort: 80
-          resources:
-            requests:
-              cpu: "50m"
-              memory: "64Mi"
-            limits:
-              cpu: "200m"
-              memory: "256Mi"
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: ecommerce-frontend-service
-  labels:
-    app: ecommerce-frontend
-spec:
-  selector:
-    app: ecommerce-frontend
-  ports:
-    - name: http
-      port: 80
-      targetPort: 80
-  type: LoadBalancer
+      - name: e-commerce-clone
+        image: manish2302/e-commerce-clone:latest
+        ports:
+        - containerPort: 80
+        resources:
+          limits:
+            cpu: "500m"
+            memory: "256Mi"
