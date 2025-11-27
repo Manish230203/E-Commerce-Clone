@@ -16,8 +16,8 @@ spec:
     spec:
       containers:
         - name: ecommerce-frontend
-          image: your-placeholder-image/replace-me:latest
-          imagePullPolicy: IfNotPresent
+          image: your-placeholder-image/replace-me:latest   # Jenkins will replace this
+          imagePullPolicy: Always
           ports:
             - containerPort: 80
           resources:
